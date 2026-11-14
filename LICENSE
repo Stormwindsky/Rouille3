@@ -19,3 +19,38 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+--------------------------------------------------------------------------------
+
+FILES NOT COVERED BY THE MIT LICENSE ABOVE
+
+The following files, and ONLY these files, are NOT licensed under the MIT
+License. They are released under the Creative Commons CC0 1.0 Universal Public
+Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/):
+
+  Rouille3/icon.png
+  Rouille3/Credits.txt
+  Rouille3/project/other/intro.mp4
+  Rouille3/project/other/Pause.png
+  Rouille3/project/other/Play.png
+  Rouille3/project/other/Redo.png
+  Rouille3/project/other/Speaker-0.png
+  Rouille3/project/other/Speaker-Crossed.png
+
+Rouille3/Credits.txt is a plain credits file (it contains no code), which is
+why it is released under CC0 1.0 too.
+
+This is an exhaustive list. The folder Rouille3/project/other/ as a whole is
+NOT placed under CC0 1.0. Any other file that is added to that folder (for
+example by someone who forks this project) is NOT covered by this license
+file: it remains under its own license, as chosen by its author, and must be
+credited accordingly (see Rouille3/Credits.txt).
+
+Everything else in this repository, including the Rust source code,
+Cargo.toml and settings.json5, is licensed under the MIT License above.
+
+CREDITS
+
+Credits for the icons and for any other asset that was not created by
+Stormwindsky are listed in:
+

@@ -1,0 +1,62 @@
+Rouille3 - Credits
+==================
+
+Only the following files of this folder are released under CC0 1.0 Universal
+(public domain dedication), not under the MIT License:
+intro.mp4, Pause.png, Play.png, Redo.png, Speaker-0.png and
+Speaker-Crossed.png (plus Rouille3/icon.png and this file, Rouille3/Credits.txt,
+which are both outside this folder).
+See the LICENSE file at the root of the project for details.
+
+Any other file added to this folder keeps its own license. Do not assume that
+it is CC0 1.0 or MIT.
+
+Any asset that was NOT created by Stormwindsky must be credited below.
+Please keep this file up to date when you add or replace an asset.
+
+Format
+------
+File:    name of the file
+Author:  who created it
+Source:  where it comes from (URL, project, ...)
+License: license of the original work (must be compatible with CC0 1.0)
+
+
+Assets
+------
+
+File:    Play.png
+Author:  Leo Red
+Source:  https://leo-red.itch.io/lucid-icon-pack
+License: CC0 1.0 Universal
+
+File:    Pause.png
+Author:  Leo Red
+Source:  https://leo-red.itch.io/lucid-icon-pack
+License: CC0 1.0 Universal
+
+File:    Redo.png
+Author:  Leo Red
+Source:  https://leo-red.itch.io/lucid-icon-pack
+License: CC0 1.0 Universal
+
+File:    Speaker-0.png
+Author:  Leo Red
+Source:  https://leo-red.itch.io/lucid-icon-pack
+License: CC0 1.0 Universal
+
+File:    Speaker-Crossed.png
+Author:  Leo Red
+Source:  https://leo-red.itch.io/lucid-icon-pack
+License: CC0 1.0 Universal
+
+File:    intro.mp4
+Author:  Stormwindsky
+Source:  https://www.stormwindsky.com/StormExplorer.html?mode=videos&q=intro+2026.mp4
+License: CC0 1.0 Universal
+
+File:    Rouille3/icon.png  (the only asset located OUTSIDE of this folder)
+Author:  Stormwindsky
+Source:  https://www.stormwindsky.com/StormExplorer.html?mode=images&q=Roy.svg
+License: CC0 1.0 Universal
+Note:    This is Roy, the mascot of Rouille3.

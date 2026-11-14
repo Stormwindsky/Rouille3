@@ -1,0 +1,97 @@
+// Rouille3 - settings.json5
+// Everything is optional: a missing key falls back to the default shown here.
+// JSON5 allows comments and trailing commas.
+{
+  game: {
+    title: "My Rouille3 Game",
+    // Folder scanned for a .sb3 file.
+    project_dir: "project",
+    // null = auto-detect the first .sb3 in project_dir.
+    // You can also drag a .sb3 onto the window or the executable, or write "project/test.sb3".
+    sb3: null,
+  },
+
+  window: {
+    // Small window by default (Scratch stage = 480x360).
+    width: 480,
+    height: 360,
+    resizable: true,
+    fullscreen: false,
+    fps: 30, // 30 = Scratch default, 60 = TurboWarp "high FPS"
+    icon: "icon.png", // window / taskbar icon (null = default)
+    // "fit" = the project fills the window and keeps its 4:3 ratio (black bars)
+    // "stretch" = the project fills the whole window, ratio ignored
+    scaling: "fit",
+  },
+
+  // Video played before the project starts. OFF by default. Needs ffmpeg + ffprobe installed.
+  intro: {
+    enabled: false,
+    file: "project/other/intro.mp4",
+    pausable: false,  // the player cannot pause the intro
+    skippable: false, // the player cannot skip the intro
+  },
+
+  // On-screen control buttons. Set `visible: false` to remove a button.
+  // Positions: top-left, top-center, top-right, bottom-left, bottom-center, bottom-right.
+  // Every icon is optional: null (or a missing file) = a simple built-in drawing.
+  controls: {
+    // Green flag. After it is pressed it becomes a pause / resume button.
+    green_flag: {
+      visible: true,
+      position: "top-left", size: 32, margin: 8,
+      icon_play: "project/other/Play.png",   // not started, or paused
+      icon_pause: "project/other/Pause.png", // running
+    },
+    // Restart button.
+    stop: {
+      visible: true,
+      position: "top-left", size: 32, margin: 8,
+      icon: "project/other/Redo.png",
+      mode: "restart", // "restart" = start again from the beginning, "stop" = just stop
+    },
+    // Mute / unmute the sound of the project (sounds and text to speech).
+    volume: {
+      visible: true,
+      position: "top-left", size: 32, margin: 8,
+      icon_on: "project/other/Speaker-0.png",
+      icon_off: "project/other/Speaker-Crossed.png",
+    },
+    auto_start: false, // click the green flag automatically at startup
+  },
+
+  // Download assets missing from the .sb3. OFF by default.
+  // Useful when an asset has a license you do not want to ship in your fork.
+  // Downloaded files are cached in project/other/downloads/.
+  downloads: {
+    enabled: false,
+    assets: {
+      // "3bbf6f866a943638802eed3732c67453.png": "https://example.com/background.png",
+    },
+  },
+
+  // Speech bubbles (say / think). No default font on purpose:
+  // without a font the bubble is drawn empty. Give a .ttf/.otf to show text.
+  speech_bubbles: {
+    font: null, // e.g. "project/other/MyFont.ttf"
+    use_builtin_font: false, // true = use the engine's own UI font when font is null
+  },
+  fonts: [
+    // { name: "MyFont", file: "project/other/MyFont.ttf" },
+  ],
+
+  // Text to speech via the external `espeak-ng` program (GPL-3.0), run as a
+  // separate process so it never touches the MIT license of Rouille3.
+  // alto / tenor / squeak / giant / kitten exist by default; override any here.
+  tts: {
+    enabled: true,
+    executable: "espeak-ng",
+    voices: {
+      // "kitten" always says "meow", higher pitch than squeak.
+      kitten: { voice: "en", pitch: 99, speed: 175, override_text: "meow" },
+    },
+  },
+
+  // Rouille3-only custom blocks (ignored by Scratch / TurboWarp).
+  custom_blocks: { shader: true, effects: true },
+}
