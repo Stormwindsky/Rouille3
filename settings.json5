@@ -92,6 +92,15 @@
     },
   },
 
+  // Variable / list monitors: the boxes shown on the stage when they are visible in the
+  // original project (or shown by a "show variable" / "show list" block).
+  // Slider monitors can be dragged by the player.
+  monitors: {
+    enabled: true,
+    font: null,             // e.g. "project/other/MyFont.ttf" (null = speech bubble font, then built-in)
+    use_builtin_font: true, // monitors are useless without text, so the built-in font is the fallback
+  },
+
   // Rouille3-only custom blocks (ignored by Scratch / TurboWarp).
   custom_blocks: { shader: true, effects: true },
 }

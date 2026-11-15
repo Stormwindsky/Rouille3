@@ -46,6 +46,7 @@ pub struct App {
     current_path: Option<PathBuf>,
     icons: HashMap<String, TextureHandle>,
     bubble_family: Option<FontFamily>,
+    monitor_family: Option<FontFamily>,
     started: bool,
 }
 
@@ -95,6 +96,7 @@ impl App {
             current_path: None,
             icons: HashMap::new(),
             bubble_family: None,
+            monitor_family: None,
             started: false,
         };
         app.setup_fonts(&cc.egui_ctx);
@@ -138,6 +140,23 @@ impl App {
         }
         if self.bubble_family.is_none() && self.settings.speech_bubbles.use_builtin_font {
             self.bubble_family = Some(FontFamily::Proportional);
+        }
+        if let Some(path) = &self.settings.monitors.font {
+            match std::fs::read(path) {
+                Ok(bytes) => {
+                    fonts.font_data.insert("monitor".into(), egui::FontData::from_owned(bytes));
+                    fonts.families.insert(FontFamily::Name("monitor".into()), vec!["monitor".into()]);
+                    self.monitor_family = Some(FontFamily::Name("monitor".into()));
+                    changed = true;
+                }
+                Err(e) => eprintln!("[fonts] monitor font {path}: {e}"),
+            }
+        }
+        if self.monitor_family.is_none() {
+            self.monitor_family = self.bubble_family.clone();
+        }
+        if self.monitor_family.is_none() && self.settings.monitors.use_builtin_font {
+            self.monitor_family = Some(FontFamily::Proportional);
         }
         if changed {
             ctx.set_fonts(fonts);
@@ -376,6 +395,95 @@ fn draw_screen_effects(painter: &Painter, rect: Rect, world: &World) {
     }
 }
 
+/// Variable / list monitors, drawn like Scratch's (orange value boxes).
+fn draw_monitors(
+    ui: &egui::Ui,
+    painter: &Painter,
+    world: &World,
+    xf: &Xf,
+    family: &Option<FontFamily>,
+    slider_set: &mut Option<(usize, f64)>,
+) {
+    let Some(fam) = family else { return };
+    let k = xf.sx;
+    let font = FontId::new(11.0 * k, fam.clone());
+    let orange = Color32::from_rgb(255, 140, 26);
+    let panel = Color32::from_rgb(230, 240, 255);
+    let border = Stroke::new(1.0f32, Color32::from_gray(190));
+    let text = Color32::from_rgb(87, 94, 117);
+    for v in world.monitor_views() {
+        let pos = Pos2::new(xf.origin.x + v.x as f32 * xf.sx, xf.origin.y + v.y as f32 * xf.sy);
+        if v.is_list {
+            let (w, h) = (if v.w > 0.0 { v.w as f32 } else { 100.0 } * k, if v.h > 0.0 { v.h as f32 } else { 200.0 } * k);
+            let rect = Rect::from_min_size(pos, Vec2::new(w, h));
+            painter.rect(rect, 4.0 * k, panel, border);
+            let head = painter.layout_no_wrap(v.label.clone(), font.clone(), text);
+            painter.galley(Pos2::new(rect.center().x - head.size().x / 2.0, rect.top() + 3.0 * k), head, text);
+            let foot = painter.layout_no_wrap(format!("length {}", v.items.len()), font.clone(), text);
+            painter.galley(Pos2::new(rect.center().x - foot.size().x / 2.0, rect.bottom() - foot.size().y - 3.0 * k), foot, text);
+            let area = Rect::from_min_max(
+                Pos2::new(rect.left() + 3.0 * k, rect.top() + 20.0 * k),
+                Pos2::new(rect.right() - 3.0 * k, rect.bottom() - 20.0 * k));
+            let clip = painter.with_clip_rect(area.intersect(painter.clip_rect()));
+            let row = 20.0 * k;
+            for (i, item) in v.items.iter().enumerate() {
+                let y = area.top() + i as f32 * row;
+                if y > area.bottom() { break }
+                let idx = clip.layout_no_wrap((i + 1).to_string(), font.clone(), text);
+                clip.galley(Pos2::new(area.left(), y + 3.0 * k), idx, text);
+                let boxr = Rect::from_min_max(Pos2::new(area.left() + 20.0 * k, y), Pos2::new(area.right(), y + row - 2.0 * k));
+                clip.rect_filled(boxr, 3.0 * k, orange);
+                let g = clip.layout_no_wrap(item.clone(), font.clone(), Color32::WHITE);
+                clip.galley(boxr.left_top() + Vec2::new(4.0 * k, 3.0 * k), g, Color32::WHITE);
+            }
+            continue;
+        }
+        if v.mode == "large" {
+            let g = painter.layout_no_wrap(v.value.clone(), FontId::new(16.0 * k, fam.clone()), Color32::WHITE);
+            let size = Vec2::new((g.size().x + 14.0 * k).max(44.0 * k), g.size().y + 8.0 * k);
+            let r = Rect::from_min_size(pos, size);
+            painter.rect_filled(r, 4.0 * k, orange);
+            painter.galley(Pos2::new(r.center().x - g.size().x / 2.0, r.top() + 4.0 * k), g, Color32::WHITE);
+            continue;
+        }
+        let label = painter.layout_no_wrap(v.label.clone(), font.clone(), text);
+        let val = painter.layout_no_wrap(v.value.clone(), font.clone(), Color32::WHITE);
+        let vbox_w = (val.size().x + 10.0 * k).max(40.0 * k);
+        let row_h = label.size().y.max(val.size().y) + 6.0 * k;
+        let mut width = label.size().x + vbox_w + 14.0 * k;
+        let slider = v.mode == "slider";
+        if slider { width = width.max(100.0 * k); }
+        let height = row_h + 4.0 * k + if slider { 16.0 * k } else { 0.0 };
+        let rect = Rect::from_min_size(pos, Vec2::new(width, height));
+        painter.rect(rect, 4.0 * k, panel, border);
+        painter.galley(Pos2::new(rect.left() + 5.0 * k, rect.top() + 5.0 * k), label.clone(), text);
+        let vb = Rect::from_min_size(
+            Pos2::new(rect.right() - vbox_w - 4.0 * k, rect.top() + 2.0 * k), Vec2::new(vbox_w, row_h));
+        painter.rect_filled(vb, 3.0 * k, orange);
+        painter.galley(Pos2::new(vb.center().x - val.size().x / 2.0, vb.top() + 3.0 * k), val, Color32::WHITE);
+        if slider {
+            let track = Rect::from_min_max(
+                Pos2::new(rect.left() + 8.0 * k, rect.bottom() - 11.0 * k),
+                Pos2::new(rect.right() - 8.0 * k, rect.bottom() - 7.0 * k));
+            painter.rect_filled(track, 2.0 * k, Color32::from_gray(200));
+            let span = (v.slider_max - v.slider_min).max(f64::EPSILON);
+            let frac = ((v.value_num - v.slider_min) / span).clamp(0.0, 1.0) as f32;
+            let hx = track.left() + frac * track.width();
+            painter.circle_filled(Pos2::new(hx, track.center().y), 5.0 * k, orange);
+            let hit = track.expand2(Vec2::new(6.0 * k, 8.0 * k));
+            let resp = ui.interact(hit, egui::Id::new(("rouille3_slider", v.index)), egui::Sense::click_and_drag());
+            if resp.dragged() || resp.clicked() {
+                if let Some(p) = resp.interact_pointer_pos() {
+                    let f = ((p.x - track.left()) / track.width()).clamp(0.0, 1.0) as f64;
+                    let mut val = v.slider_min + f * span;
+                    if v.discrete { val = val.round(); }
+                    *slider_set = Some((v.index, val));
+                }
+            }
+        }
+    }
+}
+
 fn draw_bubble(
     painter: &Painter,
     stage: Rect,
@@ -599,6 +707,8 @@ impl eframe::App for App {
         // ---- draw
         let status = self.status.clone();
         let family = self.bubble_family.clone();
+        let mfam = if self.settings.monitors.enabled { self.monitor_family.clone() } else { None };
+        let mut slider_set: Option<(usize, f64)> = None;
         let (world, gfx) = (&self.world, &mut self.gfx);
         egui::CentralPanel::default().frame(egui::Frame::none().fill(Color32::BLACK)).show(ctx, |ui| {
             let Some(world) = world else {
@@ -644,8 +754,12 @@ impl eframe::App for App {
                     draw_bubble(&painter, stage, world, s, &xf, &family);
                 }
             }
+            draw_monitors(ui, &painter, world, &xf, &mfam, &mut slider_set);
             draw_screen_effects(&painter, stage, world);
         });
+        if let (Some((i, v)), Some(w)) = (slider_set, &mut self.world) {
+            w.monitor_set(i, v);
+        }
         ctx.request_repaint();
     }
 }

@@ -14,6 +14,7 @@ pub struct Settings {
     pub fonts: Vec<FontEntry>,
     pub tts: Tts,
     pub custom_blocks: CustomBlocks,
+    pub monitors: Monitors,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -169,6 +170,21 @@ pub struct Voice {
 #[serde(default)]
 pub struct CustomBlocks { pub shader: bool, pub effects: bool }
 impl Default for CustomBlocks { fn default() -> Self { Self { shader: true, effects: true } } }
+
+/// Variable / list monitors shown on the stage (the little boxes of a Scratch project).
+#[derive(Debug, Deserialize, Clone)]
+#[serde(default)]
+pub struct Monitors {
+    /// Show the monitors that are visible in the original project.
+    pub enabled: bool,
+    /// Font (.ttf / .otf) for monitors. null = the speech bubble font, then the built-in one.
+    pub font: Option<String>,
+    /// Use the engine's built-in UI font when no font is configured (monitors are useless without text).
+    pub use_builtin_font: bool,
+}
+impl Default for Monitors {
+    fn default() -> Self { Self { enabled: true, font: None, use_builtin_font: true } }
+}
 
 fn default_voices() -> HashMap<String, Voice> {
     let v = |pitch, speed, text: Option<&str>| Voice {

@@ -88,16 +88,27 @@ pub struct Block {
     pub y: Option<f64>,
 }
 
+/// Scratch writes mutation values as strings, TurboWarp / some exporters as booleans or
+/// real arrays: accept all of them and normalise to a string.
+fn flex_string<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    let v = Value::deserialize(d)?;
+    Ok(match v {
+        Value::String(s) => s,
+        Value::Null => String::new(),
+        other => other.to_string(),
+    })
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Mutation {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "flex_string")]
     pub proccode: String,
-    #[serde(default)]
-    pub argumentids: String, // JSON-encoded array, as stored by Scratch
-    #[serde(default)]
+    #[serde(default, deserialize_with = "flex_string")]
+    pub argumentids: String, // JSON-encoded array
+    #[serde(default, deserialize_with = "flex_string")]
     pub argumentnames: String,
-    #[serde(default)]
-    pub warp: String,
+    #[serde(default, deserialize_with = "flex_string")]
+    pub warp: String, // "true" / "false"
 }
 
 #[derive(Debug, Deserialize)]

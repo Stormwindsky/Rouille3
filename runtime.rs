@@ -232,6 +232,76 @@ pub fn corners(m: &CostumeMeta, v: &Visual) -> [(f64, f64); 4] {
     out
 }
 
+/// A variable or list monitor (the box shown on the stage).
+#[derive(Clone, Debug)]
+pub struct Monitor {
+    pub id: String,
+    pub is_list: bool,
+    pub name: String,
+    /// Some(sprite name) for a local variable / list.
+    pub sprite: Option<String>,
+    pub mode: String, // default | large | slider | list
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
+    pub visible: bool,
+    pub slider_min: f64,
+    pub slider_max: f64,
+    pub discrete: bool,
+}
+
+pub struct MonitorView {
+    pub index: usize,
+    pub label: String,
+    pub mode: String,
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
+    pub is_list: bool,
+    pub value: String,
+    pub value_num: f64,
+    pub items: Vec<String>,
+    pub slider_min: f64,
+    pub slider_max: f64,
+    pub discrete: bool,
+}
+
+fn fmt_monitor(v: &Val) -> String {
+    match v {
+        Val::Num(n) if n.is_finite() => {
+            let r = (n * 1e6).round() / 1e6;
+            fmt_num(r)
+        }
+        other => other.to_str(),
+    }
+}
+
+fn build_monitors(project: &Project) -> Vec<Monitor> {
+    let f = |m: &Value, k: &str| m.get(k).and_then(|v| v.as_f64()).unwrap_or(0.0);
+    project.monitors.iter().filter_map(|m| {
+        let opcode = m.get("opcode")?.as_str()?;
+        let (is_list, key) = match opcode {
+            "data_variable" => (false, "VARIABLE"),
+            "data_listcontents" => (true, "LIST"),
+            _ => return None, // built-in reporters are not shown yet
+        };
+        Some(Monitor {
+            id: m.get("id")?.as_str()?.to_string(),
+            is_list,
+            name: m.get("params")?.get(key)?.as_str()?.to_string(),
+            sprite: m.get("spriteName").and_then(|v| v.as_str()).map(str::to_owned),
+            mode: m.get("mode").and_then(|v| v.as_str()).unwrap_or(if is_list { "list" } else { "default" }).to_string(),
+            x: f(m, "x"), y: f(m, "y"), w: f(m, "width"), h: f(m, "height"),
+            visible: m.get("visible").and_then(|v| v.as_bool()).unwrap_or(false),
+            slider_min: f(m, "sliderMin"),
+            slider_max: m.get("sliderMax").and_then(|v| v.as_f64()).unwrap_or(100.0),
+            discrete: m.get("isDiscrete").and_then(|v| v.as_bool()).unwrap_or(true),
+        })
+    }).collect()
+}
+
 pub enum PenItem {
     Line { x0: f64, y0: f64, x1: f64, y1: f64, rgba: [u8; 4], size: f64 },
     Stamp(Visual),
@@ -317,6 +387,7 @@ pub struct World {
     drag: Option<(usize, f64, f64)>,
     stop_all_flag: bool,
     unknown: HashSet<String>,
+    pub monitors: Vec<Monitor>,
 }
 
 impl World {
@@ -374,6 +445,7 @@ impl World {
             order.insert(0, stage_idx);
         }
         let procs = project.targets.iter().map(build_procs).collect();
+        let monitors = build_monitors(&project);
         let seed = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos() as u64).unwrap_or(88172645463325252) | 1;
         World {
@@ -381,7 +453,7 @@ impl World {
             time: 0.0, timer_zero: 0.0, keys: HashSet::new(), mouse: (0.0, 0.0), mouse_down: false,
             rng: Cell::new(seed), gvars, glists, stage_idx, procs, pen_items: vec![],
             shader_on: false, effects_on: HashSet::new(), drag: None, stop_all_flag: false,
-            unknown: HashSet::new(),
+            unknown: HashSet::new(), monitors,
         }
     }
 
@@ -435,6 +507,57 @@ impl World {
     pub fn mouse_release(&mut self) {
         self.mouse_down = false;
         self.drag = None;
+    }
+
+    /// Monitors currently visible, with their text already computed.
+    pub fn monitor_views(&self) -> Vec<MonitorView> {
+        let mut out = Vec::new();
+        for (i, m) in self.monitors.iter().enumerate() {
+            if !m.visible { continue }
+            let s = m.sprite.as_deref().and_then(|n| self.find_sprite(n)).unwrap_or(self.stage_idx);
+            let label = match &m.sprite { Some(n) => format!("{n}: {}", m.name), None => m.name.clone() };
+            let (mut value, mut value_num, mut items) = (String::new(), 0.0, vec![]);
+            if m.is_list {
+                if let Some(l) = self.list_ref(s, &m.id, &m.name) {
+                    items = l.iter().map(fmt_monitor).collect();
+                }
+            } else {
+                let v = self.var_get(s, &m.id, &m.name);
+                value_num = v.to_num();
+                value = fmt_monitor(&v);
+            }
+            out.push(MonitorView {
+                index: i, label, mode: m.mode.clone(), x: m.x, y: m.y, w: m.w, h: m.h, is_list: m.is_list,
+                value, value_num, items, slider_min: m.slider_min, slider_max: m.slider_max, discrete: m.discrete,
+            });
+        }
+        out
+    }
+
+    /// Slider monitors change their variable when the player drags them.
+    pub fn monitor_set(&mut self, index: usize, v: f64) {
+        let Some(m) = self.monitors.get(index).cloned() else { return };
+        if m.is_list { return }
+        let s = m.sprite.as_deref().and_then(|n| self.find_sprite(n)).unwrap_or(self.stage_idx);
+        self.var_set(s, &m.id, &m.name, Val::Num(v));
+    }
+
+    fn set_monitor_visible(&mut self, s: usize, id: &str, name: &str, is_list: bool, visible: bool) {
+        if let Some(m) = self.monitors.iter_mut().find(|m| m.id == id) {
+            m.visible = visible;
+            return;
+        }
+        if !visible { return }
+        // The project never showed it: create a monitor at the default place, like Scratch does.
+        let local = if is_list { self.sprites[s].lists.contains_key(id) } else { self.sprites[s].vars.contains_key(id) };
+        let shown = self.monitors.iter().filter(|m| m.visible).count() as f64;
+        self.monitors.push(Monitor {
+            id: id.to_string(), is_list, name: name.to_string(),
+            sprite: if local { Some(self.sprites[s].name.clone()) } else { None },
+            mode: if is_list { "list".into() } else { "default".into() },
+            x: 5.0, y: 5.0 + shown * 27.0, w: 0.0, h: 0.0, visible: true,
+            slider_min: 0.0, slider_max: 100.0, discrete: true,
+        });
     }
 
     pub fn visual(&self, s: usize) -> Visual {
@@ -1287,7 +1410,14 @@ impl World {
                 let len = self.list_mut(s, &i, &n).len();
                 if let Some(k) = self.list_index(&idx, len) { self.list_mut(s, &i, &n)[k] = v; }
             }
-            "data_showvariable" | "data_hidevariable" | "data_showlist" | "data_hidelist" => {}
+            "data_showvariable" | "data_hidevariable" => {
+                let (n, i) = field_pair(b, "VARIABLE");
+                self.set_monitor_visible(s, &i, &n, false, b.opcode == "data_showvariable");
+            }
+            "data_showlist" | "data_hidelist" => {
+                let (n, i) = field_pair(b, "LIST");
+                self.set_monitor_visible(s, &i, &n, true, b.opcode == "data_showlist");
+            }
             // ---------------- sensing
             "sensing_resettimer" => self.timer_zero = self.time,
             "sensing_setdragmode" => { self.sprites[s].draggable = field_str(b, "DRAG_MODE") == "draggable"; }
@@ -1394,6 +1524,25 @@ fn build_procs(t: &Target) -> HashMap<String, ProcDef> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Runs any project given in /tmp/p1.sb3 headlessly (skipped when the file is absent).
+    #[test]
+    fn runs_p1() {
+        let p = std::path::Path::new("/tmp/p1.sb3");
+        if !p.exists() { return }
+        let lp = load_sb3(p).expect("project must parse");
+        let meta = lp.project.targets.iter()
+            .map(|t| t.costumes.iter().map(|_| CostumeMeta { w: 96.0, h: 100.0, rcx: 48.0, rcy: 50.0 }).collect())
+            .collect();
+        let audio = Rc::new(RefCell::new(Audio::new()));
+        let mut w = World::new(lp.project, lp.assets, meta, Settings::default(), audio);
+        w.green_flag();
+        for _ in 0..90 { w.tick(1.0 / 30.0); }
+        println!("sprites alive: {}", w.sprites.iter().filter(|s| !s.deleted).count());
+        println!("unsupported: {:?}", w.unknown);
+        for m in w.monitor_views() { println!("monitor {} = {} ({}) at {},{}", m.label, m.value, m.mode, m.x, m.y); }
+        println!("vars: {:?}", w.gvars.values().map(|(n, v)| format!("{n}={}", v.to_str())).collect::<Vec<_>>());
+    }
 
     /// Runs the real test project headlessly (no window, no GPU).
     #[test]
